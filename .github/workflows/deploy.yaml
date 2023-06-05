@@ -1,0 +1,65 @@
+name: Deploy EKS
+on:
+  workflow_call:
+    inputs:
+      environment:
+        required: true
+        type: string
+      project-name:
+        required: true
+        type: string
+      image-tag:
+        required: true
+        type: string
+      github-event-sha:
+        required: true
+        type: string
+    secrets:
+      aws-access-key-id:
+        required: true
+      aws-secret-access-key:
+        required: true
+      aws-region:
+        required: true
+      github-token:
+        required: true
+      argocd-user:
+        required: true
+      argocd-password:
+        required: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          ref: ${{ inputs.github-event-sha }}
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.aws-access-key-id }}
+          aws-secret-access-key: ${{ secrets.aws-secret-access-key }}
+          aws-region: ${{ secrets.aws-region }}
+
+      - name: Install ArgoCD Cli
+        env:
+          ARGOCD_USER: ${{ secrets.argocd-user }}
+          ARGOCD_PASSWORD: ${{ secrets.argocd-password }}
+        run: |
+          curl -sSL -o /usr/local/bin/argocd https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64
+          chmod +x /usr/local/bin/argocd
+          argocd login --username "$ARGOCD_USER" --password "$ARGOCD_PASSWORD" argocd.domain.com --grpc-web
+
+      - name: Deploy
+        env:
+          IMAGE: ${{ inputs.project-name }}:${{ inputs.image-tag }}
+          ARGO_APP_NAME: ${{ inputs.project-name }}-${{ inputs.environment }}
+          APOLLO_KEY: ${{ secrets.apollo-key }}
+        run: |
+          argocd app set "${{ env.ARGO_APP_NAME }}" \
+          -p image=${{ env.IMAGE }} \
+          argocd app wait "${{ env.ARGO_APP_NAME }}"

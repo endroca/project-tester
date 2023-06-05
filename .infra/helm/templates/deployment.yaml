@@ -1,0 +1,67 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: "{{ .Release.Name }}"
+  namespace: "{{ .Release.Namespace }}"
+spec:
+  selector:
+    matchLabels:
+      app: "{{ .Release.Name }}"
+  replicas: {{ .Values.project.replicas }}
+  template:
+    metadata:
+      labels:
+        app: "{{ .Release.Name }}"
+    spec:
+      {{- if .Values.nodeGroup }}
+      nodeSelector:
+        eks.amazonaws.com/nodegroup: "{{ .Values.nodeGroup }}"
+      {{- end }}
+      {{- if .Values.secretsManager }}
+      volumes:
+        - name: secrets-store
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: "{{ .Release.Name }}-spc"
+      {{- end }}
+      serviceAccountName: "{{ .Release.Name }}"
+      containers:
+        - name: "{{ .Release.Name }}"
+          image: "{{ .Values.project.image }}"
+          imagePullPolicy: Always
+          ports:
+            - containerPort: {{ .Values.project.port }}
+          livenessProbe:
+            tcpSocket:
+              port: {{ .Values.project.port }}
+            initialDelaySeconds: 10
+            periodSeconds: 60
+            failureThreshold: 2
+          {{- if .Values.project.env }}
+          env:
+            {{- range $key, $value := .Values.project.env }}
+            - name: {{ $key }}
+              {{- if or (eq (typeOf $value) "string") (eq (typeOf $value) "bool") (eq (typeOf $value) "int") (eq (typeOf $value) "float64") }}
+              value: {{ $value | quote }}
+              {{- else }}
+              {{- if (($value).secretKeyRef) }}
+              valueFrom:
+                secretKeyRef:
+                  name: "{{ $.Release.Name }}-secrets"
+                  key: {{ $value.secretKeyRef }}
+              {{- else if (($value).fieldRef) }}
+              valueFrom:
+                fieldRef:
+                  fieldPath: {{ $value.fieldRef }}
+              {{- end }}
+            {{- end }}
+            {{- end }}
+          {{- end }}
+          {{- if .Values.secretsManager }}
+          volumeMounts:
+            - name: secrets-store
+              mountPath: "/mnt/secrets-store"
+              readOnly: true
+          {{- end }}

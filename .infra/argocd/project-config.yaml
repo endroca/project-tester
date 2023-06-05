@@ -1,0 +1,17 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: project-tester
+
+spec:
+  destinations:
+    - name: "*"
+      namespace: project-tester
+      server: "*"
+  clusterResourceWhitelist:
+    - group: "*"
+      kind: "*"
+  orphanedResources:
+    warn: true
+  sourceRepos:
+    - https://github.com/endroca/project-tester

@@ -1,0 +1,26 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: project-tester-dev
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+
+spec:
+  project: project-tester
+  source:
+    repoURL: https://github.com/endroca/project-tester
+    path: .infra/helm
+    targetRevision: main
+    helm:
+      valueFiles:
+        - .infra/helm/values-dev.yaml
+  destination:
+    namespace: project-tester
+    name: cluster
+  syncPolicy:
+    syncOptions:
+      - ApplyOutOfSyncOnly=true
+      - CreateNamespace=true
+    automated:
+      prune: true
+      selfHeal: true

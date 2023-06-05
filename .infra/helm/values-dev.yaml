@@ -1,0 +1,14 @@
+serviceAccount:
+
+nodeGroup:
+
+secretsManager:
+  name: SecretIfNecessary
+  objects:
+
+project:
+  port: 3333
+  image:
+  replicas: 1
+  env:
+    ENV: production
